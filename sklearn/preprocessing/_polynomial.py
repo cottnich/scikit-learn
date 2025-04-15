@@ -311,6 +311,8 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
         """
         _, n_features = validate_data(self, X, accept_sparse=True).shape
 
+        if self.method == "qr" and self.include_bias:
+            raise ValueError("include_bias must be False when method='qr'.")
         if isinstance(self.degree, Integral):
             if self.degree == 0 and not self.include_bias:
                 raise ValueError(
@@ -385,7 +387,6 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
             interaction_only=self.interaction_only,
             include_bias=self.include_bias,
         )
-
         return self
 
     def transform(self, X):
