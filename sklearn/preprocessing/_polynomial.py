@@ -185,13 +185,12 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
     }
 
     def __init__(
-        self, degree=2, *, interaction_only=False, include_bias=True, order="C", method="raw"
+        self, degree=2, *, interaction_only=False, include_bias=True, order="C"
     ):
         self.degree = degree
         self.interaction_only = interaction_only
         self.include_bias = include_bias
         self.order = order
-        self.method = method
 
     @staticmethod
     def _combinations(
@@ -309,17 +308,6 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
         """
         _, n_features = validate_data(self, X, accept_sparse=True).shape
 
-        if self.method not in ["raw", "qr"]:
-            raise ValueError("method must be 'raw' or 'qr'")
-        if self.method == "qr":
-            if self.include_bias:
-                warnings.warn(
-                    "include_bias=True is ignored when method='qr'. Setting include_bias=False.",
-                    UserWarning
-                )
-                self.include_bias = False
-                self._mean = np.mean(X, axis=0)
-                X_centered = X - self._mean
         if isinstance(self.degree, Integral):
             if self.degree == 0 and not self.include_bias:
                 raise ValueError(
@@ -395,12 +383,6 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
             include_bias=self.include_bias,
         )
 
-        if self.method = "qr":
-            poly_terms = np.column_stack([X_centered**d for d in range(1, self.degree+1)])
-            Q, R = np.linalg.qr(poly_terms)
-            signs = np.sign(np.diag(R))
-            self._components = Q * signs
-
         return self
 
     def transform(self, X):
@@ -442,13 +424,6 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
             reset=False,
             accept_sparse=("csr", "csc"),
         )
-
-        if self.method = "qr":
-            X_centered = X - self._mean
-            poly_terms = np.column_stack([X.centered**d for d in range(1, self.degree+1)])
-            return poly_terms @ self._components.T
-        else:
-            return super().transform(X)
 
         n_samples, n_features = X.shape
         max_int32 = np.iinfo(np.int32).max
