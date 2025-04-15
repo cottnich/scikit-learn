@@ -182,15 +182,18 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
         "interaction_only": ["boolean"],
         "include_bias": ["boolean"],
         "order": [StrOptions({"C", "F"})],
+        "method": [StrOptions({"raw", "qr"})],
+
     }
 
     def __init__(
-        self, degree=2, *, interaction_only=False, include_bias=True, order="C"
+        self, degree=2, *, interaction_only=False, include_bias=True, order="C", method="raw"
     ):
         self.degree = degree
         self.interaction_only = interaction_only
         self.include_bias = include_bias
         self.order = order
+        self.method = method
 
     @staticmethod
     def _combinations(
