@@ -235,6 +235,30 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
             combinations += 1
 
         return combinations
+    def _compute_qr_components(self, X):
+        """Compute and store QR components if method='qr'"""
+        if self.method != "qr":
+            return
+        orig_method = self.method
+        self.method = "raw"
+        try:
+            ##Get raw polynomial features
+            XP = self.transform(X)
+            if sparse.issparse(XP):
+                XP = XP.toarray()
+
+            if XP.shape[0] < XP.shape[1]:
+                raise ValueError(
+                    f"n_samples={XP.shape[0]} must be >= n_output_features={XP.shape[1]} "
+                    "for QR decomposition"
+                )
+            ##Actually compute
+            Q, R = np.linalg.qr(XP, mode='reduced')
+            self.QR_components_ = (Q,R)
+            self.R_inv_ = np.linalg.inv(R)
+        finally:
+            ##Set method back to 'qr'
+            self.method = orig_method
 
     @property
     def powers_(self):
@@ -387,6 +411,7 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
             interaction_only=self.interaction_only,
             include_bias=self.include_bias,
         )
+        self._compute_qr_components(X)
         return self
 
     def transform(self, X):
