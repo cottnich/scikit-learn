@@ -195,6 +195,10 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
         self.order = order
         self.method = method
 
+        ##Automatically set include_bias to False when method='qr'
+        if self.method == "qr":
+            self.include_bias=False
+
     @staticmethod
     def _combinations(
         n_features, min_degree, max_degree, interaction_only, include_bias
@@ -239,27 +243,25 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
         """Compute and store QR components if method='qr'"""
         if self.method != "qr":
             return
-        orig_method = self.method
-        self.method = "raw"
-        try:
-            ##Get raw polynomial features
-            XP = self.transform(X)
-            if sparse.issparse(XP):
-                XP = XP.toarray()
-
-            if XP.shape[0] < XP.shape[1]:
+        n_features = X.shape[1]
+        self.qr_components_ = []
+        
+        for i in range(n_features):
+            x = X[:, [i]]  # shape (n_samples, 1)
+            
+            # Get raw polynomial terms for this feature only
+            poly = PolynomialFeatures(degree=self.degree, 
+                                      include_bias=False,
+                                      interaction_only=False)
+            x_poly = poly.fit_transform(x)
+            min_samples = poly.n_output_features_
+            if x.shape[0] < min_samples + 1:
                 raise ValueError(
-                    f"n_samples={XP.shape[0]} must be >= n_output_features={XP.shape[1]} "
-                    "for QR decomposition"
+                    f"Feature {i}: Needs {min_samples+1} samples (got {x.shape[0]})"
                 )
-            ##Actually compute
-            Q, R = np.linalg.qr(XP, mode='reduced')
-            self.QR_components_ = (Q,R)
-            self.R_inv_ = np.linalg.inv(R)
-        finally:
-            ##Set method back to 'qr'
-            self.method = orig_method
-
+            # Compute QR decomposition
+            Q, R = np.linalg.qr(x_poly, mode='reduced')
+            self.qr_components_.append((Q, R))
     @property
     def powers_(self):
         """Exponent for each of the inputs in the output."""
@@ -335,8 +337,11 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
         """
         _, n_features = validate_data(self, X, accept_sparse=True).shape
 
-        if self.method == "qr" and self.include_bias:
-            raise ValueError("include_bias must be False when method='qr'.")
+        if self.method == "qr":
+            if self.include_bias:
+                raise ValueError("include_bias must be False when method='qr'.")
+            if self.interaction_only:
+                raise ValueError("Cannot use interaction_only=True with method='qr'")
         if isinstance(self.degree, Integral):
             if self.degree == 0 and not self.include_bias:
                 raise ValueError(

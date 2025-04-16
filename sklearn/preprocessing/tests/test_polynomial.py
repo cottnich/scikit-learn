@@ -1228,9 +1228,51 @@ def test_csr_polynomial_expansion_windows_fail(csr_container):
         X_trans = pf.fit_transform(X)
         for idx in range(3):
             assert X_trans[0, expected_indices[idx]] == pytest.approx(1.0)
+
 def test_qr_method_validation():
-    with pytest.raises(ValueError, match="include_bias must be False"):
-        PolynomialFeatures(method="qr", include_bias=True).fit([[1]])
-    
+    with pytest.raises(ValueError, match="Cannot use interaction_only"):
+        PolynomialFeatures(method='qr', interaction_only=True, include_bias=False).fit([[1]])
     with pytest.raises(ValueError, match="The 'method' parameter"):
         PolynomialFeatures(method="invalid").fit([[1]])
+    poly = PolynomialFeatures(method='qr')
+    assert poly.include_bias is False
+    poly = PolynomialFeatures()
+    assert poly.include_bias is True
+def test_qr_components_structure():
+    X = np.array([[1, 10], [2, 20], [3, 30]])  # 3 samples, 2 features
+    poly = PolynomialFeatures(degree=2, method='qr')
+    poly.fit(X)
+    
+    assert hasattr(poly, 'qr_components_')
+    assert len(poly.qr_components_) == X.shape[1]  # One entry per feature
+def test_single_feature_qr():
+    X = np.array([[1], [2], [3]])  # 3 samples, 1 feature
+    poly = PolynomialFeatures(degree=2, method='qr')
+    poly.fit(X)
+    
+    assert len(poly.qr_components_) == 1  # One entry for our single feature
+    assert poly.qr_components_[0] is not None  # Should be populated
+def test_qr_orthogonality_single_feature():
+    X = np.array([[1], [2], [3], [4]])  # 4 samples, 1 feature (degree=2 needs min 3 samples)
+    poly = PolynomialFeatures(degree=2, method='qr')
+    poly.fit(X)
+    
+    # Verify we have QR components
+    assert len(poly.qr_components_) == 1
+    Q, R = poly.qr_components_[0]
+    
+    # Check Q is orthogonal (Q.T @ Q ≈ I)
+    assert_allclose(Q.T @ Q, np.eye(Q.shape[1]), atol=1e-10)
+    
+    # Check R is upper triangular
+    assert np.allclose(R, np.triu(R))
+    
+    # Check reconstruction (Q @ R should match raw polynomials)
+    x_poly = PolynomialFeatures(degree=2, include_bias=False).fit_transform(X)
+    assert_allclose(Q @ R, x_poly, rtol=1e-10)
+def test_qr_insufficient_samples():
+    X = np.array([[1], [2]])  # Only 2 samples for degree=2 (needs 3)
+    poly = PolynomialFeatures(degree=2, method='qr')
+    
+    with pytest.raises(ValueError, match="Feature 0: Needs 3 samples"):
+        poly.fit(X)
