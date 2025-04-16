@@ -1228,3 +1228,9 @@ def test_csr_polynomial_expansion_windows_fail(csr_container):
         X_trans = pf.fit_transform(X)
         for idx in range(3):
             assert X_trans[0, expected_indices[idx]] == pytest.approx(1.0)
+def test_qr_method_validation():
+    with pytest.raises(ValueError, match="include_bias must be False"):
+        PolynomialFeatures(method="qr", include_bias=True).fit([[1]])
+    
+    with pytest.raises(ValueError, match="The 'method' parameter"):
+        PolynomialFeatures(method="invalid").fit([[1]])
