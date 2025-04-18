@@ -183,7 +183,6 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
         "include_bias": ["boolean"],
         "order": [StrOptions({"C", "F"})],
         "method": [StrOptions({"raw", "qr"})],
-
     }
 
     def __init__(
@@ -248,12 +247,13 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
         
         for i in range(n_features):
             x = X[:, [i]]  # shape (n_samples, 1)
+            x_centered = (x-np.mean(x))-np.std(x)
             
             # Get raw polynomial terms for this feature only
             poly = PolynomialFeatures(degree=self.degree, 
                                       include_bias=False,
                                       interaction_only=False)
-            x_poly = poly.fit_transform(x)
+            x_poly = poly.fit_transform(x_centered)
             min_samples = poly.n_output_features_
             if x.shape[0] < min_samples + 1:
                 raise ValueError(
@@ -342,6 +342,9 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
                 raise ValueError("include_bias must be False when method='qr'.")
             if self.interaction_only:
                 raise ValueError("Cannot use interaction_only=True with method='qr'")
+            if X.shape[1] != 1:
+                raise ValueError("method='qr' is only supported for univariate input at this stage.")
+
         if isinstance(self.degree, Integral):
             if self.degree == 0 and not self.include_bias:
                 raise ValueError(
@@ -461,6 +464,14 @@ class PolynomialFeatures(TransformerMixin, BaseEstimator):
 
         n_samples, n_features = X.shape
         max_int32 = np.iinfo(np.int32).max
+        if self.method == "qr":
+            check_is_fitted(self,"qr_components_")
+            self.qr_components_[0][0]
+            transformed_blocks = []
+            for Q, _ in self.qr_components_:
+                transformed_blocks.append(Q)
+            return np.hstack(transformed_blocks)
+
         if sparse.issparse(X) and X.format == "csr":
             if self._max_degree > 3:
                 return self.transform(X.tocsc()).tocsr()
